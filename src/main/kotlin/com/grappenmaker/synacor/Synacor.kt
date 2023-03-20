@@ -33,35 +33,35 @@ object Opcodes {
     private val supportedOpcodes = buildMap {
         opcode("halt", 0U) { halt() }
 
-        opcode("set", 1U, parameters = 2) { respond(valuedParameter(1)) }
-        opcode("push", 2U, parameters = 1) { stack.addLast(valuedParameter(0)) }
+        opcode("set", 1U, parameters = 2) { respond(parameter(1)) }
+        opcode("push", 2U, parameters = 1) { stack.addLast(parameter(0)) }
         opcode("pop", 3U, parameters = 1) { respond(stack.removeLast()) }
 
-        opcode("eq", 4U, parameters = 3) { respond((valuedParameter(1) == valuedParameter(2)).toUInt()) }
-        opcode("gt", 5U, parameters = 3) { respond((valuedParameter(1) > valuedParameter(2)).toUInt()) }
+        opcode("eq", 4U, parameters = 3) { respond((parameter(1) == parameter(2)).toUInt()) }
+        opcode("gt", 5U, parameters = 3) { respond((parameter(1) > parameter(2)).toUInt()) }
 
         jumpOpcode("jmp", 6U)
-        jumpOpcode("jt", 7U, parameters = 2) { valued(parameter(0)) != 0U }
-        jumpOpcode("jf", 8U, parameters = 2) { valued(parameter(0)) == 0U }
+        jumpOpcode("jt", 7U, parameters = 2) { parameter(0) != 0U }
+        jumpOpcode("jf", 8U, parameters = 2) { parameter(0) == 0U }
 
-        opcode("add", 9U, parameters = 3) { respond((valuedParameter(1) + valuedParameter(2)).ranged()) }
-        opcode("mul", 10U, parameters = 3) { respond((valuedParameter(1) * valuedParameter(2)).ranged()) }
-        opcode("mod", 11U, parameters = 3) { respond((valuedParameter(1) % valuedParameter(2)).ranged()) }
-        opcode("and", 12U, parameters = 3) { respond(valuedParameter(1) and valuedParameter(2)) }
-        opcode("or", 13U, parameters = 3) { respond(valuedParameter(1) or valuedParameter(2)) }
-        opcode("not", 14U, parameters = 2) { respond(valuedParameter(1).inv() and 0x7FFFU) }
+        opcode("add", 9U, parameters = 3) { respond((parameter(1) + parameter(2)).ranged()) }
+        opcode("mul", 10U, parameters = 3) { respond((parameter(1) * parameter(2)).ranged()) }
+        opcode("mod", 11U, parameters = 3) { respond((parameter(1) % parameter(2)).ranged()) }
+        opcode("and", 12U, parameters = 3) { respond(parameter(1) and parameter(2)) }
+        opcode("or", 13U, parameters = 3) { respond(parameter(1) or parameter(2)) }
+        opcode("not", 14U, parameters = 2) { respond(parameter(1).inv() and 0x7FFFU) }
 
-        opcode("rmem", 15U, parameters = 2) { respond(this[valuedParameter(1)]) }
-        opcode("wmem", 16U, parameters = 2) { this[valuedParameter(0)] = valuedParameter(1) }
+        opcode("rmem", 15U, parameters = 2) { respond(this[parameter(1)]) }
+        opcode("wmem", 16U, parameters = 2) { this[parameter(0)] = parameter(1) }
 
         opcode("call", 17U, parameters = 1, updatePC = false) {
             stack.addLast(pc + 2U)
-            pc = valuedParameter(0)
+            pc = parameter(0)
         }
 
         opcode("ret", 18U, updatePC = false) { pc = (stack.removeLastOrNull() ?: return@opcode halt()) }
 
-        opcode("out", 19U, parameters = 1) { print(valuedParameter(0).toInt().toChar()) }
+        opcode("out", 19U, parameters = 1) { print(parameter(0).toInt().toChar()) }
         opcode("in", 20U, parameters = 1) { respond(getInputChar() ?: return@opcode halt()) }
 
         opcode("noop", 21U) { /* no-op */ }
@@ -100,7 +100,7 @@ object Opcodes {
         val cond: Computer.() -> Boolean
     ) : Opcode {
         override fun Computer.handle() {
-            pc = if (cond()) valuedParameter(parameters - 1)
+            pc = if (cond()) parameter(parameters - 1)
             else pc + parameters.toUInt() + 1U
         }
     }
@@ -125,8 +125,6 @@ class Computer {
     val stack by resettable { ArrayDeque<UInt>() }
     var pc: UInt by resettable { 0U }
     var running by resettable { false }
-        private set
-
     var paused by resettable { false }
 
     val inputCharacters by resettable { mutableListOf<Char>() }
@@ -150,9 +148,9 @@ class Computer {
         else -> error("Invalid memory index $index")
     } and 0xFFFFu
 
-    fun parameter(index: Int) = get(pc + index.toUInt() + 1U)
-    fun valuedParameter(index: Int) = valued(parameter(index))
-    fun respond(value: UInt) = set(parameter(0), value)
+    private fun currOffset(index: Int) = get(pc + index.toUInt() + 1U)
+    fun parameter(index: Int) = valued(currOffset(index))
+    fun respond(value: UInt) = set(currOffset(0), value)
 
     fun step() {
         val opcode = memory[pc.toInt()]
@@ -296,7 +294,7 @@ object DebugCommands {
         }
 
         command(name = "stepnewline", description = "Steps until newline", requiresPause = true) {
-            while (memory[pc.toInt()] != 19U || valuedParameter(0) != 10U) {
+            while (memory[pc.toInt()] != 19U || parameter(0) != 10U) {
                 step()
                 stepInspect()
             }
@@ -334,6 +332,10 @@ object DebugCommands {
 
             inputCharacters += file.readLines().filterNot { it.startsWith("//") }
                 .joinToString(separator = "\n", postfix = "\n").toList()
+        }
+
+        command(name = "jump", description = "Unconditionally jumps/sets pc to given address") { args ->
+            pc = args.firstOrNull()?.toUIntOrNull() ?: return@command println("Invalid PC")
         }
     }
 
