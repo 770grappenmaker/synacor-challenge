@@ -50,23 +50,17 @@ Explanation:
 if (deepRecursion(4, 1, R7) == 6) teleport()
 
 Now to force it to work, do the following things:
-set 5489 21
-set 5490 21
-set 5491 21
-set 5492 1
-set 5493 32768
-set 5494 1
-set R7 25734 (output of main, in my case this value)
+    /set 1571 15
+    /set 1572 15
+    /set 1573 15
+    /set 1574 1
+    /set 1575 8000
+    /set 1576 1
+    /set R7 6486 (output of main, in hex, in my case this value)
+Or use my handy-dandy command, /teleporter
  */
 
-// We can pack these since we know they are at most 15 bits, which fits in an int
-// Inline for speed
-@Suppress("NOTHING_TO_INLINE")
-private inline fun pack(reg0: Int, reg1: Int) = reg0 shl 15 or reg1
-
-// Great naming btw
-// TODO: optimize more?
-fun MutableMap<Int, Int>.deepRecursion(reg0: Int, reg1: Int, reg7: Int): Int = getOrPut(pack(reg0, reg1)) {
+fun MutableMap<Int, Int>.deepRecursion(reg0: Int, reg1: Int, reg7: Int): Int = getOrPut(reg0 shl 15 or reg1) {
     when {
         reg0 == 0 -> (reg1 + 1).mod(0x8000)
         reg1 == 0 -> deepRecursion(reg0 - 1, reg7, reg7)
