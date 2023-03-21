@@ -1,41 +1,46 @@
 package com.grappenmaker.synacor
 
+import kotlin.system.measureTimeMillis
+
 const val targetValue = 30
 
 // probably overkill, I am a bit rusty though...
-fun main() {
-    with(
-        """
-            * 8 - 1
-            4 * 11 *
-            + 4 - 18
-            22 - 9 *
-        """.trimIndent().lines().map { it.split(" ").map(String::parseOrbItem) }.asGrid()
-    ) {
-        fun solve(path: List<Point> = listOf(bottomLeftCorner)) {
-            val last = path.last()
-            val value = path.map { this[it] }.getValue()
-            if (value !in 1..0x7fff) return
-            if (path.size > 15) return
-
-            if (
-                last == topRightCorner
-                && path.size % 2 != 0
-                && value == targetValue
+fun main() = println(
+    "Took ${
+        measureTimeMillis {
+            with(
+                """
+                * 8 - 1
+                4 * 11 *
+                + 4 - 18
+                22 - 9 *
+                """.trimIndent().lines().map { it.split(" ").map(String::parseOrbItem) }.asGrid()
             ) {
-                println("Found *a* path: $path")
-                println("Movement: ${path.windowed(2) { (a, b) -> (b - a).asDirection() } }")
-                return
-            } else {
-                last.adjacentSides()
-                    .filter { it != bottomLeftCorner && (it != topRightCorner || it !in path) }
-                    .forEach { solve(path + it) }
+                val queue = queueOf<List<Point>>(listOf(bottomLeftCorner))
+                queue.drain { path ->
+                    val last = path.last()
+                    val value = path.map { this[it] }.getValue()
+                    when {
+                        value !in 1..0x7fff || path.size > 15 -> return@drain
+                        last == topRightCorner
+                                && path.size % 2 != 0
+                                && value == targetValue -> {
+                            println("Found *a* path: $path")
+                            println("Movement: ${path.windowed(2) { (a, b) -> (b - a).asDirection() }}")
+                            return@with
+                        }
+
+                        else -> {
+                            last.adjacentSides()
+                                .filter { it != bottomLeftCorner && (it != topRightCorner || it !in path) }
+                                .forEach { queue.addFirst(path + it) }
+                        }
+                    }
+                }
             }
         }
-
-        solve()
-    }
-}
+    }ms"
+)
 
 fun String.parseOrbItem() = toIntOrNull()?.let { MazeItem.Number(it) } ?: MazeItem.Operator(
     when (this) {
